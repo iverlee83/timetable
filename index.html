@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>My Daily Timetable</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Comic Sans MS', 'Trebuchet MS', 'Segoe UI', sans-serif;
+    background: linear-gradient(135deg, #ffe9f3 0%, #e3f6ff 50%, #fff7e0 100%);
+    color: #333;
+    padding: 20px;
+    min-height: 100vh;
+  }
+  h1 {
+    text-align: center;
+    color: #ff6f91;
+    font-size: 2.2rem;
+    margin-bottom: 4px;
+    text-shadow: 2px 2px 0 #fff;
+  }
+  .subtitle { text-align: center; color: #5a9bd4; margin-bottom: 18px; font-size: 1rem; }
+
+  .topbar {
+    display: flex; flex-wrap: wrap; gap: 12px; align-items: center;
+    justify-content: center; margin-bottom: 20px;
+  }
+  .topbar label { font-weight: bold; color: #555; }
+  input[type="date"], input[type="text"]#title {
+    border: 3px solid #ffd6e7; border-radius: 12px; padding: 8px 12px;
+    font-size: 1rem; font-family: inherit; background: #fff;
+  }
+  input#title { width: 240px; }
+
+  .layout { display: flex; gap: 20px; flex-wrap: wrap; align-items: flex-start; }
+  .panel {
+    background: rgba(255,255,255,0.75); border-radius: 20px; padding: 18px;
+    box-shadow: 0 6px 18px rgba(0,0,0,0.08);
+  }
+  .schedule-panel { flex: 1.4; min-width: 340px; }
+  .activities-panel { flex: 1; min-width: 320px; }
+  .panel h2 { color: #7b6fff; margin-bottom: 12px; font-size: 1.3rem; text-align: center; }
+
+  /* 2-column grids */
+  #slots { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 18px; }
+  #activities { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px; align-items: start; }
+  .cat-header {
+    grid-column: 1 / -1; font-weight: bold; font-size: 0.95rem;
+    margin-top: 7px; margin-bottom: 1px; padding-bottom: 3px;
+    border-bottom: 2px solid currentColor;
+  }
+  .cat-header:first-child { margin-top: 0; }
+  @media (max-width: 1000px){ #activities { grid-template-columns: 1fr 1fr; } }
+  @media (max-width: 760px){
+    #slots, #activities { grid-template-columns: 1fr; }
+  }
+
+  /* Slots */
+  .slot-row { display: flex; align-items: center; margin-bottom: 0; }
+  .slot-time {
+    width: 72px; flex-shrink: 0; font-weight: bold; color: #ff8c42;
+    font-size: 0.85rem; text-align: right; padding-right: 8px;
+  }
+  .slot-drop {
+    flex: 1; min-height: 40px; border: 2.5px dashed #cfe5ff; border-radius: 12px;
+    background: #fff; display: flex; align-items: center; padding: 2px 6px;
+    transition: all 0.15s;
+  }
+  .slot-drop.dragover { border-color: #7b6fff; background: #f0ecff; transform: scale(1.01); }
+  .slot-drop input {
+    border: none; outline: none; width: 100%; font-family: inherit;
+    font-size: 0.95rem; background: transparent; padding: 6px;
+  }
+  .slot-clear {
+    border: none; background: #ffd6e7; color: #d63384; border-radius: 50%;
+    width: 24px; height: 24px; cursor: pointer; font-weight: bold;
+    flex-shrink: 0; margin-left: 4px; line-height: 1;
+  }
+  .slot-clear:hover { background: #ff9ec4; color: #fff; }
+
+  /* Activities */
+  .activity {
+    background: #fff; border-radius: 10px; padding: 6px 8px; margin-bottom: 0;
+    cursor: grab; font-weight: bold; font-size: 0.82rem;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.08);
+    border-left: 6px solid #7b6fff; transition: transform 0.1s;
+    display: flex; align-items: center; gap: 5px; line-height: 1.15;
+  }
+  .activity:hover { transform: translateX(3px); }
+  .activity:active { cursor: grabbing; }
+  .activity .emoji { font-size: 1rem; }
+  .activity.selected {
+    border-left-color: #ff6f91; background: #fff0f5;
+    box-shadow: 0 0 0 3px #ffb6cf; transform: scale(1.03);
+  }
+
+  .buttons { display: flex; gap: 12px; justify-content: center; margin: 22px 0; flex-wrap: wrap; }
+  button.action {
+    border: none; border-radius: 14px; padding: 12px 26px; font-size: 1.05rem;
+    font-family: inherit; font-weight: bold; cursor: pointer; color: #fff;
+    box-shadow: 0 4px 0 rgba(0,0,0,0.15); transition: transform 0.1s;
+  }
+  button.action:active { transform: translateY(3px); box-shadow: none; }
+  .btn-generate { background: #ff6f91; }
+  .btn-copy { background: #41c7a8; }
+  .btn-download { background: #5a9bd4; }
+  .btn-clear-all { background: #b0a8c9; }
+
+  /* Result */
+  #resultWrap { display: none; margin-top: 10px; }
+  #result {
+    background: #fff; border-radius: 20px; padding: 30px 34px;
+    box-shadow: 0 6px 18px rgba(0,0,0,0.1); max-width: 620px; margin: 0 auto;
+  }
+  #result h2 { color: #ff6f91; text-align: center; font-size: 2.1rem; margin-bottom: 4px; }
+  #result .rdate { text-align: center; color: #5a9bd4; margin-bottom: 18px; font-weight: bold; font-size: 1.2rem; }
+  .res-row { display: flex; align-items: center; padding: 12px 6px; border-bottom: 1px dashed #e3e3e3; }
+  .res-row:nth-child(even) { background: #fafaff; }
+  .res-time { width: 150px; font-weight: bold; color: #ff8c42; flex-shrink: 0; font-size: 1.15rem; }
+  .res-act { flex: 1; color: #222; font-size: 1.25rem; font-weight: bold; }
+  .res-act.empty { color: #cccccc; font-style: italic; font-weight: normal; }
+  .toast {
+    position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
+    background: #41c7a8; color: #fff; padding: 12px 24px; border-radius: 30px;
+    font-weight: bold; box-shadow: 0 4px 12px rgba(0,0,0,0.2); opacity: 0;
+    transition: opacity 0.3s; pointer-events: none; z-index: 99;
+  }
+  .toast.show { opacity: 1; }
+</style>
+</head>
+<body>
+  <h1>🗓️ My Daily Timetable</h1>
+  <p class="subtitle">Tap an activity then tap a slot — or drag, or just type!</p>
+
+  <div class="topbar">
+    <label for="title">Title:</label>
+    <input type="text" id="title" value="My Day Plan">
+    <label for="datePick">Date:</label>
+    <input type="date" id="datePick">
+  </div>
+
+  <div class="layout">
+    <div class="panel schedule-panel">
+      <h2>⏰ Time Slots</h2>
+      <div id="slots"></div>
+    </div>
+    <div class="panel activities-panel">
+      <h2>🎯 Activities</h2>
+      <p style="font-size:0.8rem;color:#888;text-align:center;margin-bottom:10px;">Tap to select, then tap a slot (reusable!)</p>
+      <div id="activities"></div>
+    </div>
+  </div>
+
+  <div class="buttons">
+    <button class="action btn-generate" onclick="generate()">✨ Generate</button>
+    <button class="action btn-copy" onclick="copyText()">📋 Copy</button>
+    <button class="action btn-download" onclick="downloadImg()">🖼️ Download Image</button>
+    <button class="action btn-clear-all" onclick="clearAll()">🧹 Clear All</button>
+  </div>
+
+  <div id="resultWrap">
+    <div id="result"></div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+<script>
+  const categories = [
+    { cat:"Meals", emoji:"🍽️", color:"#ff8c42", items:[
+      {n:"Breakfast", e:"🥣"},
+      {n:"Lunch", e:"🍱"},
+      {n:"Dinner", e:"🍝"}
+    ]},
+    { cat:"Routine", emoji:"🧼", color:"#41c7a8", items:[
+      {n:"Brushing Teeth", e:"🪥"},
+      {n:"Shower", e:"🚿"}
+    ]},
+    { cat:"Music Training", emoji:"🎼", color:"#7b6fff", items:[
+      {n:"Practise Piano", e:"🎹"},
+      {n:"Practise Drum", e:"🥁"},
+      {n:"Practise Violin", e:"🎻"},
+      {n:"Practise Flute", e:"🎵"}
+    ]},
+    { cat:"Learning", emoji:"✏️", color:"#5a9bd4", items:[
+      {n:"Chinese Homework", e:"📚"},
+      {n:"English Homework", e:"📖"},
+      {n:"Math Homework", e:"🔢"},
+      {n:"Reading", e:"📕"},
+      {n:"Reading Chinese Book", e:"📙"},
+      {n:"Reading English Book", e:"📘"},
+      {n:"Practise Presentation", e:"🎤"}
+    ]},
+    { cat:"Leisure", emoji:"🎉", color:"#ff6f91", items:[
+      {n:"Dancing", e:"💃"},
+      {n:"Rope Skipping", e:"🤸"},
+      {n:"Exercise", e:"🏃"},
+      {n:"Board Game", e:"🎲"},
+      {n:"Play Roblox", e:"🎮"},
+      {n:"Watch TV", e:"📺"},
+      {n:"Individual Free time", e:"🌈"}
+    ]}
+  ];
+
+  // Build time slots 9:00 -> 21:00, 30 min interval (last slot 20:30-21:00)
+  function fmt(h, m){
+    const ampm = h < 12 ? "am" : "pm";
+    let hh = h % 12; if (hh === 0) hh = 12;
+    return hh + ":" + (m === 0 ? "00" : "30") + ampm;
+  }
+  const times = [];
+  for (let h = 9; h < 21; h++){
+    times.push([h,0]); times.push([h,30]);
+  }
+
+  const slotsEl = document.getElementById("slots");
+  times.forEach((t, i) => {
+    const start = fmt(t[0], t[1]);
+    const endM = t[1] === 0 ? 30 : 0;
+    const endH = t[1] === 0 ? t[0] : t[0] + 1;
+    const end = fmt(endH, endM);
+    const row = document.createElement("div");
+    row.className = "slot-row";
+    row.innerHTML = `
+      <div class="slot-time">${start}</div>
+      <div class="slot-drop" data-idx="${i}">
+        <input type="text" placeholder="Drop or type here..." data-time="${start} - ${end}">
+      </div>
+      <button class="slot-clear" title="Clear">×</button>`;
+    slotsEl.appendChild(row);
+
+    const drop = row.querySelector(".slot-drop");
+    const input = row.querySelector("input");
+    drop.addEventListener("dragover", e => { e.preventDefault(); drop.classList.add("dragover"); });
+    drop.addEventListener("dragleave", () => drop.classList.remove("dragover"));
+    drop.addEventListener("drop", e => {
+      e.preventDefault();
+      drop.classList.remove("dragover");
+      const txt = e.dataTransfer.getData("text/plain");
+      input.value = txt;
+    });
+    // Click-to-fill: if an activity is selected, clicking the slot fills it
+    input.addEventListener("focus", () => {
+      if (selectedActivity) {
+        input.value = selectedActivity;
+        clearSelection();
+      }
+    });
+    row.querySelector(".slot-clear").addEventListener("click", () => { input.value = ""; });
+  });
+
+  let selectedActivity = null;
+  function clearSelection(){
+    selectedActivity = null;
+    document.querySelectorAll(".activity.selected").forEach(a => a.classList.remove("selected"));
+  }
+
+  // Build draggable activities (reusable - stay in place), grouped by category
+  const actEl = document.getElementById("activities");
+  categories.forEach(group => {
+    const header = document.createElement("div");
+    header.className = "cat-header";
+    header.style.color = group.color;
+    header.innerHTML = `${group.emoji} ${group.cat}`;
+    actEl.appendChild(header);
+
+    group.items.forEach(a => {
+      const div = document.createElement("div");
+      div.className = "activity";
+      div.draggable = true;
+      div.style.borderLeftColor = group.color;
+      div.innerHTML = `<span class="emoji">${a.e}</span> ${a.n}`;
+      const label = a.e + " " + a.n;
+      div.addEventListener("dragstart", e => {
+        e.dataTransfer.setData("text/plain", label);
+      });
+      div.addEventListener("click", () => {
+        if (div.classList.contains("selected")) { clearSelection(); return; }
+        clearSelection();
+        selectedActivity = label;
+        div.classList.add("selected");
+      });
+      actEl.appendChild(div);
+    });
+  });
+
+  // Default date = tomorrow
+  const tomorrow = new Date();
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  document.getElementById("datePick").value = tomorrow.toISOString().slice(0,10);
+
+  function prettyDate(iso){
+    if(!iso) return "";
+    const d = new Date(iso + "T00:00:00");
+    return d.toLocaleDateString("en-GB", {weekday:"long", day:"numeric", month:"long", year:"numeric"});
+  }
+
+  function collect(){
+    const rows = [];
+    document.querySelectorAll(".slot-drop input").forEach(inp => {
+      rows.push({ time: inp.dataset.time, act: inp.value.trim() });
+    });
+    return rows;
+  }
+
+  function generate(){
+    const rows = collect();
+    const title = document.getElementById("title").value || "My Day Plan";
+    const dateStr = prettyDate(document.getElementById("datePick").value);
+    let html = `<h2>${escapeHtml(title)}</h2><div class="rdate">${dateStr}</div>`;
+    rows.forEach(r => {
+      const cls = r.act ? "res-act" : "res-act empty";
+      const val = r.act ? escapeHtml(r.act) : "—";
+      html += `<div class="res-row"><div class="res-time">${r.time}</div><div class="${cls}">${val}</div></div>`;
+    });
+    document.getElementById("result").innerHTML = html;
+    document.getElementById("resultWrap").style.display = "block";
+    document.getElementById("resultWrap").scrollIntoView({behavior:"smooth"});
+  }
+
+  function copyText(){
+    const rows = collect();
+    const title = document.getElementById("title").value || "My Day Plan";
+    const dateStr = prettyDate(document.getElementById("datePick").value);
+    let lines = [title, dateStr, ""];
+    rows.forEach(r => { if(r.act) lines.push(`${r.time} — ${r.act}`); });
+    const text = lines.join("\n");
+    navigator.clipboard.writeText(text).then(
+      () => toast("Copied to clipboard! 📋"),
+      () => { fallbackCopy(text); }
+    );
+  }
+  function fallbackCopy(text){
+    const ta = document.createElement("textarea");
+    ta.value = text; document.body.appendChild(ta); ta.select();
+    try { document.execCommand("copy"); toast("Copied! 📋"); }
+    catch(e){ alert("Copy failed. Here is the text:\n\n" + text); }
+    document.body.removeChild(ta);
+  }
+
+  function downloadImg(){
+    if(document.getElementById("resultWrap").style.display === "none"){ generate(); }
+    const target = document.getElementById("result");
+    html2canvas(target, {scale:3, backgroundColor:"#ffffff"}).then(canvas => {
+      const link = document.createElement("a");
+      const dt = document.getElementById("datePick").value || "timetable";
+      link.download = "timetable_" + dt + ".png";
+      link.href = canvas.toDataURL("image/png");
+      link.click();
+      toast("Image downloaded! 🖼️");
+    });
+  }
+
+  function clearAll(){
+    if(!confirm("Clear all time slots?")) return;
+    document.querySelectorAll(".slot-drop input").forEach(i => i.value = "");
+    document.getElementById("resultWrap").style.display = "none";
+  }
+
+  function escapeHtml(s){
+    return s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+  }
+  let toastTimer;
+  function toast(msg){
+    const t = document.getElementById("toast");
+    t.textContent = msg; t.classList.add("show");
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => t.classList.remove("show"), 2000);
+  }
+</script>
+</body>
+</html>
